@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>THE LAST WARD</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;font-family:'Courier New',monospace;user-select:none;}
+canvas{display:block;position:fixed;top:0;left:0;}
+
+/* SCREENS */
+.screen{position:fixed;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:50;background:#080604;}
+.hidden{display:none!important;}
+
+#titleScreen h1{font-size:clamp(2rem,10vw,4rem);letter-spacing:.25em;color:#d4a843;
+  text-shadow:0 0 30px #d4a84388;animation:flicker 5s infinite;text-align:center;padding:0 1rem;}
+.sub{font-size:clamp(.6rem,2.5vw,.8rem);letter-spacing:.3em;color:#3a3020;
+  margin:.8rem 0 2rem;text-align:center;padding:0 1.5rem;line-height:2.2;}
+.btn{background:transparent;border:1px solid #d4a84355;color:#d4a843;
+  padding:.9rem 2.5rem;font-family:'Courier New',monospace;
+  font-size:clamp(.75rem,2.5vw,1rem);letter-spacing:.3em;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;}
+.btn:active{background:#d4a84322;}
+
+#noteScreen{background:rgba(4,3,2,.97);overflow-y:auto;justify-content:flex-start;padding:2rem 0;}
+.nbox{max-width:480px;width:90%;background:#0e0b08;border:1px solid #d4a84322;padding:1.8rem;margin:auto;}
+.nlbl{font-size:.6rem;letter-spacing:.3em;color:#d4a84355;margin-bottom:1rem;}
+.nbody{font-size:clamp(.78rem,2.5vw,.9rem);line-height:1.9;color:#a88858;white-space:pre-wrap;}
+.nclose{margin-top:1.5rem;}
+
+#deathScreen h2{font-size:clamp(2rem,9vw,4rem);color:#7a1212;
+  letter-spacing:.3em;text-shadow:0 0 40px #7a121288;animation:flicker 2s infinite;text-align:center;}
+#deathScreen p{color:#3a2a2a;margin:1rem 0 2rem;letter-spacing:.15em;font-size:.8rem;}
+#winScreen h2{font-size:clamp(2rem,9vw,4rem);color:#d4a843;
+  letter-spacing:.3em;text-shadow:0 0 40px #d4a84388;text-align:center;}
+#winScreen p{color:#554433;font-size:.8rem;letter-spacing:.1em;margin-top:1rem;text-align:center;}
+
+/* HUD */
+#hud{position:fixed;top:0;left:0;right:0;padding:.7rem 1rem;
+  display:flex;justify-content:space-between;align-items:center;z-index:20;pointer-events:none;}
+#sanW{display:flex;flex-direction:column;gap:3px;}
+#sanL{font-size:.5rem;letter-spacing:.25em;color:#3a3020;}
+#sanT{width:80px;height:3px;background:#0d0b09;border:1px solid #222;}
+#sanF{height:100%;background:#d4a843;transition:width .4s,background .5s;}
+#nL{font-size:.6rem;color:#3a3020;letter-spacing:.15em;}
+#mmCanvas{border:1px solid #1a1510;opacity:.5;}
+
+#prompt{position:fixed;bottom:32%;left:50%;transform:translateX(-50%);
+  font-size:.65rem;letter-spacing:.2em;color:#d4a843;background:#000000bb;
+  padding:.35rem .9rem;border:1px solid #d4a84333;pointer-events:none;z-index:20;
+  white-space:nowrap;display:none;}
+
+#vig{position:fixed;inset:0;pointer-events:none;z-index:8;
+  background:radial-gradient(ellipse at center,transparent 30%,#000 100%);opacity:.45;}
+#fear{position:fixed;inset:0;pointer-events:none;z-index:9;
+  background:radial-gradient(ellipse at center,transparent 10%,#500 100%);opacity:0;transition:opacity .7s;}
+#flash{position:fixed;inset:0;pointer-events:none;z-index:100;opacity:0;background:#000;}
+
+/* MOBILE CONTROLS */
+#joyBase{position:fixed;left:4vw;bottom:5vw;width:110px;height:110px;border-radius:50%;
+  background:rgba(212,168,67,.07);border:1px solid rgba(212,168,67,.25);
+  z-index:30;touch-action:none;}
+#joyKnob{position:absolute;width:42px;height:42px;border-radius:50%;
+  background:rgba(212,168,67,.28);border:1px solid rgba(212,168,67,.6);
+  top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;}
+#lookPad{position:fixed;right:0;top:0;width:55%;height:75%;z-index:30;touch-action:none;}
+#readBtn{position:fixed;right:5vw;bottom:22vw;width:65px;height:65px;border-radius:50%;
+  background:rgba(212,168,67,.12);border:1.5px solid rgba(212,168,67,.45);
+  color:#d4a843;font-size:.52rem;letter-spacing:.08em;z-index:31;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  touch-action:none;-webkit-tap-highlight-color:transparent;}
+
+@keyframes flicker{0%,100%{opacity:1}90%{opacity:1}91%{opacity:.2}92%{opacity:1}96%{opacity:.6}97%{opacity:1}}
+</style>
+</head>
+<body>
+
+<canvas id="gc"></canvas>
+<canvas id="mmCanvas" width="68" height="68" style="position:fixed;top:.7rem;left:50%;transform:translateX(-50%);z-index:20;pointer-events:none;"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="sanW"><div id="sanL">SANITY</div><div id="sanT"><div id="sanF" style="width:100%"></div></div></div>
+  <div id="nL">NOTES <span id="nC">0</span>/5</div>
+</div>
+<div id="prompt"></div>
+<div id="vig"></div>
+<div id="fear"></div>
+<div id="flash"></div>
+
+<!-- MOBILE CONTROLS (always in DOM, shown after start) -->
+<div id="joyBase" style="display:none"><div id="joyKnob"></div></div>
+<div id="lookPad" style="display:none"></div>
+<div id="readBtn" style="display:none" ontouchstart="tryInteract()">READ</div>
+
+<!-- SCREENS -->
+<div class="screen" id="titleScreen">
+  <h1>THE LAST WARD</h1>
+  <div class="sub">WARD 7 · ABANDONED PSYCHIATRIC HOSPITAL<br>
+    <span style="color:#222;font-size:.85em">find 5 notes · reach the exit · stay sane</span>
+  </div>
+  <button class="btn" id="enterBtn">ENTER</button>
+</div>
+
+<div class="screen hidden" id="noteScreen">
+  <div class="nbox">
+    <div class="nlbl">— FOUND DOCUMENT —</div>
+    <div class="nbody" id="noteBody"></div>
+    <button class="btn nclose" id="closeBtn">[ CONTINUE ]</button>
+  </div>
+</div>
+
+<div class="screen hidden" id="deathScreen">
+  <h2>CONSUMED</h2>
+  <p>the darkness swallowed you whole</p>
+  <button class="btn" onclick="location.reload()">[ TRY AGAIN ]</button>
+</div>
+
+<div class="screen hidden" id="winScreen">
+  <h2>ESCAPED</h2>
+  <p>Ward 7 will remember you.</p>
+</div>
+
+<script>
+// ═══════════════════════════════════
+// MAP  0=open 1=wall 2=door 3=exit
+// ═══════════════════════════════════
+const MW=16,MH=22;
+const MAP=[
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,1,1,1,2,1,1,1,0,0,0,0,0,1,
+  1,0,0,1,0,0,0,0,0,1,0,0,0,0,0,1,
+  1,0,0,2,0,0,0,0,0,1,0,0,0,0,0,1,
+  1,0,0,1,0,0,0,0,0,1,0,0,1,1,1,1,
+  1,0,0,1,1,1,1,1,1,1,0,0,1,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,2,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,
+  1,0,0,1,1,1,2,1,1,0,0,0,0,0,0,1,
+  1,0,0,1,0,0,0,1,1,0,0,0,0,0,0,1,
+  1,0,0,1,0,0,0,2,0,0,0,0,0,0,0,1,
+  1,0,0,1,1,1,1,1,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,1,1,2,1,1,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,
+  1,0,0,0,0,0,0,0,0,0,0,0,0,3,0,1,
+  1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,
+];
+function mcell(x,y){
+  const tx=Math.floor(x),ty=Math.floor(y);
+  if(tx<0||ty<0||tx>=MW||ty>=MH)return 1;
+  return MAP[ty*MW+tx];
+}
+function solid(x,y){return mcell(x,y)>=1;}
+
+// ═══════════════════════════════════
+// STORY
+// ═══════════════════════════════════
+const STORY=[
+  {x:5.5,y:1.5,text:`DR. VOSS — INTAKE REPORT #001\n\nPatient 47 admitted Tuesday.\nClaims to hear voices from the walls.\nSays they whisper his name.\n\nWe have sedated him twice.\nHe keeps escaping his room.\n\nThe lights in Ward 7 flicker every night.\nMaintenance finds nothing wrong.\n\nSomething is very wrong here.\n\n— Dr. Elias Voss`},
+  {x:6,y:5,text:`NURSE LOG — DAY 12\n\nFound Patient 47 in east corridor again.\nFacing the wall. Whispering numbers.\n\n4. 7. 4. 7. 4. 7.\n\nHe turned and said:\n"It is already inside the building."\n\nI asked what was inside.\nHe smiled and said nothing.\n\nI am requesting a transfer.`},
+  {x:13,y:8.5,text:`INTERNAL MEMO — RESTRICTED\n\nINCIDENT — WARD 7 — 02:14 AM\n\nSix patients found unconscious.\nNo trauma. No cause identified.\n\nDR. VOSS IS MISSING.\nHis office mirror was shattered\nfrom the inside.\n\nDO NOT contact press.\n\n— Administration`},
+  {x:5.5,y:12.5,text:`— scrawled on torn paper —\n\nit comes when you stop moving\n\nkeep moving\n\nit cannot find you if you stay calm\n\ndo not go to the east wing\n\nif you find this — LEAVE NOW\n\n— [name torn away]`},
+  {x:8,y:19.5,text:`DR. VOSS — FINAL ENTRY\n\nI understand now.\n\nPatient 47 was hearing IT.\nThe entity between the walls.\n\nIt feeds on fear. On sanity.\nThe more afraid you are,\nthe stronger it gets.\n\nThe exit is south. Bottom of ward.\nWalk toward it. Stay calm.\n\nDon't run. Don't panic.\n\nI am so sorry.\n\n— Elias Voss, M.D.`},
+];
+
+// ═══════════════════════════════════
+// STATE
+// ═══════════════════════════════════
+const gc=document.getElementById('gc');
+const ctx=gc.getContext('2d');
+const mm=document.getElementById('mmCanvas');
+const mctx=mm.getContext('2d');
+let W,H;
+function resize(){W=gc.width=window.innerWidth;H=gc.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+const isMob=('ontouchstart' in window)||navigator.maxTouchPoints>0;
+
+const P={x:2.5,y:2.5,a:0};
+const ENT={x:8,y:19,active:false,timer:25};
+let sanity=100,noteCount=0,alive=true,gameOn=false;
+let notes=[];
+let nearIdx=-1;
+
+// Input state — clean simple object
+const input={
+  fwd:0,    // -1 to 1
+  str:0,    // -1 to 1
+  turn:0,   // accumulated turn delta
+};
+
+// ═══════════════════════════════════
+// PC CONTROLS
+// ═══════════════════════════════════
+const K={};
+function setupPC(){
+  window.addEventListener('keydown',e=>{
+    K[e.code]=true;
+    if(e.code==='KeyE')tryInteract();
+  });
+  window.addEventListener('keyup',e=>{K[e.code]=false;});
+  window.addEventListener('mousemove',e=>{
+    if(document.pointerLockElement)input.turn+=e.movementX*0.003;
+  });
+  gc.addEventListener('click',()=>{
+    if(gameOn&&!document.pointerLockElement)
+      document.body.requestPointerLock().catch(()=>{});
+  });
+}
+
+// ═══════════════════════════════════
+// MOBILE CONTROLS
+// ═══════════════════════════════════
+function setupMobile(){
+  const jb=document.getElementById('joyBase');
+  const kn=document.getElementById('joyKnob');
+  const lp=document.getElementById('lookPad');
+  const rb=document.getElementById('readBtn');
+  jb.style.display='block';
+  lp.style.display='block';
+  rb.style.display='flex';
+
+  const MAXR=34;
+  let jID=null,jCX=0,jCY=0;
+  let lID=null,lLX=0;
+
+  // JOYSTICK
+  jb.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.changedTouches[0];
+    jID=t.identifier;
+    const r=jb.getBoundingClientRect();
+    jCX=r.left+r.width/2;
+    jCY=r.top+r.height/2;
+    input.fwd=0; input.str=0;
+  },{passive:false});
+
+  jb.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    for(let i=0;i<e.changedTouches.length;i++){
+      const t=e.changedTouches[i];
+      if(t.identifier!==jID)continue;
+      let dx=t.clientX-jCX;
+      let dy=t.clientY-jCY;
+      const d=Math.sqrt(dx*dx+dy*dy);
+      if(d>MAXR){dx=dx/d*MAXR;dy=dy/d*MAXR;}
+      input.str=dx/MAXR;
+      input.fwd=-(dy/MAXR);
+      kn.style.transform='translate(calc(-50% + '+dx+'px),calc(-50% + '+dy+'px))';
+    }
+  },{passive:false});
+
+  function joyEnd(e){
+    e.preventDefault();
+    for(let i=0;i<e.changedTouches.length;i++){
+      if(e.changedTouches[i].identifier===jID){
+        jID=null;
+        input.fwd=0; input.str=0;
+        kn.style.transform='translate(-50%,-50%)';
+      }
+    }
+  }
+  jb.addEventListener('touchend',joyEnd,{passive:false});
+  jb.addEventListener('touchcancel',joyEnd,{passive:false});
+
+  // LOOK PAD
+  lp.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.changedTouches[0];
+    lID=t.identifier;
+    lLX=t.clientX;
+  },{passive:false});
+
+  lp.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    for(let i=0;i<e.changedTouches.length;i++){
+      const t=e.changedTouches[i];
+      if(t.identifier!==lID)continue;
+      input.turn+=(t.clientX-lLX)*0.007;
+      lLX=t.clientX;
+    }
+  },{passive:false});
+
+  function lookEnd(e){
+    e.preventDefault();
+    for(let i=0;i<e.changedTouches.length;i++){
+      if(e.changedTouches[i].identifier===lID)lID=null;
+    }
+  }
+  lp.addEventListener('touchend',lookEnd,{passive:false});
+  lp.addEventListener('touchcancel',lookEnd,{passive:false});
+}
+
+// ═══════════════════════════════════
+// GAME START
+// ═══════════════════════════════════
+document.getElementById('enterBtn').addEventListener('click',startGame);
+document.getElementById('enterBtn').addEventListener('touchend',e=>{e.preventDefault();startGame();});
+document.getElementById('closeBtn').addEventListener('click',closeNote);
+document.getElementById('closeBtn').addEventListener('touchend',e=>{e.preventDefault();closeNote();});
+
+function startGame(){
+  document.getElementById('titleScreen').classList.add('hidden');
+  notes=STORY.map((s,i)=>({x:s.x,y:s.y,si:i,collected:false}));
+  P.x=2.5;P.y=2.5;P.a=0;
+  sanity=100;noteCount=0;alive=true;
+  ENT.active=false;ENT.timer=25;ENT.x=8;ENT.y=19;
+  input.fwd=0;input.str=0;input.turn=0;
+  if(isMob)setupMobile();
+  else setupPC();
+  gameOn=true;
+  initAudio();
+  requestAnimationFrame(loop);
+  // Try fullscreen
+  try{
+    const el=document.documentElement;
+    if(el.requestFullscreen)el.requestFullscreen();
+    else if(el.webkitRequestFullscreen)el.webkitRequestFullscreen();
+  }catch(e){}
+}
+
+
+// ═══════════════════════════════════
+// AUDIO ENGINE (Web Audio API)
+// ═══════════════════════════════════
+let audioCtx=null;
+let ambienceNode=null,ambienceGain=null;
+let heartbeatInterval=null;
+
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+
+  // Master gain
+  const master=audioCtx.createGain();
+  master.gain.value=0.7;
+  master.connect(audioCtx.destination);
+
+  // AMBIENCE — deep drone
+  function makeOsc(freq,type,gain){
+    const o=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    o.type=type; o.frequency.value=freq;
+    g.gain.value=gain;
+    o.connect(g); g.connect(master);
+    o.start();
+    return {o,g};
+  }
+
+  // Low rumble
+  const d1=makeOsc(40,'sine',0.18);
+  const d2=makeOsc(43,'sine',0.12);
+  const d3=makeOsc(80,'sawtooth',0.04);
+
+  // Slowly modulate pitch for uneasy feeling
+  function wobble(){
+    if(!audioCtx) return;
+    d1.o.frequency.setTargetAtTime(40+Math.random()*4,audioCtx.currentTime,2);
+    d2.o.frequency.setTargetAtTime(43+Math.random()*3,audioCtx.currentTime,2);
+    setTimeout(wobble,2000+Math.random()*3000);
+  }
+  wobble();
+
+  // High freq distant whisper noise
+  const bufLen=audioCtx.sampleRate*2;
+  const buf=audioCtx.createBuffer(1,bufLen,audioCtx.sampleRate);
+  const data=buf.getChannelData(0);
+  for(let i=0;i<bufLen;i++) data[i]=(Math.random()*2-1)*0.015;
+  const noise=audioCtx.createBufferSource();
+  noise.buffer=buf; noise.loop=true;
+  const noiseFilter=audioCtx.createBiquadFilter();
+  noiseFilter.type='bandpass';
+  noiseFilter.frequency.value=800;
+  noiseFilter.Q.value=0.5;
+  const noiseGain=audioCtx.createGain();
+  noiseGain.gain.value=0.08;
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(master);
+  noise.start();
+
+  // Store for entity fear effect
+  ambienceGain=noiseGain;
+  window._audioMaster=master;
+  window._audioDrones=[d1,d2,d3];
+}
+
+function playFootstep(){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(120+Math.random()*40,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(60,audioCtx.currentTime+0.08);
+  g.gain.setValueAtTime(0.15,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.12);
+  o.connect(g); g.connect(window._audioMaster);
+  o.start(); o.stop(audioCtx.currentTime+0.12);
+}
+
+function playCreak(){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type='sawtooth';
+  o.frequency.setValueAtTime(200+Math.random()*100,audioCtx.currentTime);
+  o.frequency.linearRampToValueAtTime(80,audioCtx.currentTime+0.3);
+  g.gain.setValueAtTime(0.06,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.3);
+  o.connect(g); g.connect(window._audioMaster);
+  o.start(); o.stop(audioCtx.currentTime+0.3);
+}
+
+function playHeartbeat(){
+  if(!audioCtx) return;
+  function beat(t){
+    const o=audioCtx.createOscillator();
+    const g=audioCtx.createGain();
+    o.type='sine'; o.frequency.value=60;
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.4,t+0.04);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.18);
+    o.connect(g); g.connect(window._audioMaster);
+    o.start(t); o.stop(t+0.2);
+  }
+  const now=audioCtx.currentTime;
+  beat(now); beat(now+0.15);
+}
+
+function playJump(){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator();
+  const g=audioCtx.createGain();
+  o.type='square';
+  o.frequency.setValueAtTime(400,audioCtx.currentTime);
+  o.frequency.exponentialRampToValueAtTime(50,audioCtx.currentTime+0.15);
+  g.gain.setValueAtTime(0.3,audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.15);
+  o.connect(g); g.connect(window._audioMaster);
+  o.start(); o.stop(audioCtx.currentTime+0.15);
+}
+
+function updateAudio(entityDist,isMoving){
+  if(!audioCtx) return;
+  // Heartbeat when entity close
+  if(entityDist<5 && Math.random()<0.02) playHeartbeat();
+  // Ramp up noise when entity close
+  if(ambienceGain){
+    const target=entityDist<8 ? 0.08+(8-entityDist)*0.025 : 0.08;
+    ambienceGain.gain.setTargetAtTime(Math.min(0.3,target),audioCtx.currentTime,0.5);
+  }
+  // Occasional creak
+  if(Math.random()<0.002) playCreak();
+}
+
+let stepTimer=0;
+function tickFootsteps(dt,moving){
+  if(!moving||!audioCtx) return;
+  stepTimer+=dt;
+  if(stepTimer>0.38){stepTimer=0;playFootstep();}
+}
+
+// ═══════════════════════════════════
+// GAME LOOP
+// ═══════════════════════════════════
+let last=0;
+function loop(ts){
+  if(!gameOn){requestAnimationFrame(loop);return;}
+  const dt=Math.min((ts-last)/1000,0.05);
+  last=ts;
+  update(dt);
+  render();
+  drawMM();
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  if(!alive)return;
+
+  // PC keyboard input
+  if(!isMob){
+    input.fwd=0;input.str=0;
+    if(K['KeyW']||K['ArrowUp'])input.fwd=1;
+    if(K['KeyS']||K['ArrowDown'])input.fwd=-1;
+    if(K['KeyA'])input.str=-1;
+    if(K['KeyD'])input.str=1;
+    if(K['ArrowLeft'])input.turn-=2.2*dt;
+    if(K['ArrowRight'])input.turn+=2.2*dt;
+  }
+
+  // Apply turn
+  P.a+=input.turn;
+  input.turn=0;
+
+  // Apply movement
+  const S=3.2*dt;
+  const fx=Math.cos(P.a)*input.fwd*S + Math.cos(P.a+Math.PI/2)*input.str*S;
+  const fy=Math.sin(P.a)*input.fwd*S + Math.sin(P.a+Math.PI/2)*input.str*S;
+  if(!solid(P.x+fx,P.y))P.x+=fx;
+  if(!solid(P.x,P.y+fy))P.y+=fy;
+
+  // Audio
+  const isMoving=Math.abs(input.fwd)>0.1||Math.abs(input.str)>0.1;
+  tickFootsteps(dt,isMoving);
+  const entD=ENT.active?Math.sqrt((P.x-ENT.x)**2+(P.y-ENT.y)**2):99;
+  updateAudio(entD,isMoving);
+
+  // Win check
+  if(mcell(P.x,P.y)===3){
+    if(noteCount>=5){triggerWin();return;}
+    else showMsg('FIND ALL 5 NOTES FIRST...');
+  }
+
+  // Note proximity
+  nearIdx=-1;
+  for(let i=0;i<notes.length;i++){
+    if(notes[i].collected)continue;
+    if((notes[i].x-P.x)**2+(notes[i].y-P.y)**2<2.25){nearIdx=i;break;}
+  }
+  const pr=document.getElementById('prompt');
+  if(nearIdx>=0){
+    pr.textContent=isMob?'TAP READ BUTTON':'[ E ] READ NOTE';
+    pr.style.display='block';
+  }else{
+    pr.style.display='none';
+  }
+
+  // Entity
+  ENT.timer-=dt;
+  if(ENT.timer<=0&&noteCount>0){
+    ENT.timer=Math.max(5,18-noteCount*2.5)+Math.random()*3;
+    spawnEnt();
+  }
+  if(ENT.active){
+    const ex=P.x-ENT.x,ey=P.y-ENT.y;
+    const ed=Math.sqrt(ex*ex+ey*ey);
+    if(ed<0.65){die();return;}
+    const sp=0.02+noteCount*0.004;
+    ENT.x+=ex/ed*sp;
+    ENT.y+=ey/ed*sp;
+    const fear=Math.max(0,Math.min(1,1-ed/7));
+    document.getElementById('fear').style.opacity=fear*.85;
+    sanity-=(7-Math.min(ed,7))*2.5*dt;
+    if(ed>20)despawnEnt();
+  }
+
+  // Sanity
+  sanity=Math.max(0,Math.min(100,sanity-0.7*dt));
+  const pct=sanity/100;
+  document.getElementById('sanF').style.width=(pct*100)+'%';
+  document.getElementById('sanF').style.background=pct>.5?'#d4a843':pct>.25?'#a05020':'#7a1212';
+  if(sanity<=0)die();
+  if(sanity<25&&Math.random()<.02){
+    gc.style.transform='translate('+(Math.random()-.5)*5+'px,'+(Math.random()-.5)*5+'px)';
+    setTimeout(()=>gc.style.transform='',80);
+  }
+}
+
+// ═══════════════════════════════════
+// RAYCASTER
+// ═══════════════════════════════════
+const FOV=Math.PI/2.6;
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const RAYS=isMob?Math.ceil(W/4):Math.ceil(W/2.5);
+  const SW=Math.ceil(W/RAYS)+1;
+  const halfH=H/2;
+  const zbuf=new Float32Array(RAYS);
+
+  // Sky/floor
+  ctx.fillStyle='#1a1610';
+  ctx.fillRect(0,0,W,halfH);
+  const fg=ctx.createLinearGradient(0,halfH,0,H);
+  fg.addColorStop(0,'#2a2218');fg.addColorStop(1,'#161210');
+  ctx.fillStyle=fg;ctx.fillRect(0,halfH,W,halfH);
+
+  for(let i=0;i<RAYS;i++){
+    const ra=P.a-FOV/2+(i/RAYS)*FOV;
+    const cos=Math.cos(ra),sin=Math.sin(ra);
+    let dist=25,type=0;
+    for(let d=0.05;d<25;d+=0.05){
+      const rx=P.x+cos*d,ry=P.y+sin*d;
+      const c=mcell(rx,ry);
+      if(c>=1){dist=d;type=c;break;}
+    }
+    const corr=dist*Math.cos(ra-P.a);
+    zbuf[i]=corr;
+    if(corr>=25)continue;
+    const sh=Math.min(H*1.1,H/corr);
+    const sy=halfH-sh/2;
+    const b=Math.max(0,1-corr/12);
+    let r,g,bv;
+    if(type===3){r=Math.floor(25+b*55);g=Math.floor(55+b*75);bv=Math.floor(30+b*50);}
+    else if(type===2){r=Math.floor(60+b*70);g=Math.floor(40+b*45);bv=Math.floor(18+b*22);}
+    else{r=Math.floor(28+b*60);g=Math.floor(20+b*45);bv=Math.floor(12+b*25);}
+    ctx.fillStyle='rgb('+r+','+g+','+bv+')';
+    ctx.fillRect((i/RAYS)*W,sy,SW,sh);
+  }
+
+  // Sprites
+  const spr=[...notes.filter(n=>!n.collected)];
+  if(ENT.active)spr.push({x:ENT.x,y:ENT.y,_e:true});
+  spr.sort((a,b)=>((b.x-P.x)**2+(b.y-P.y)**2)-((a.x-P.x)**2+(a.y-P.y)**2));
+  for(const s of spr)drawSprite(s,zbuf,RAYS);
+
+  // Vignette
+  const vg=ctx.createRadialGradient(W/2,H/2,H*.18,W/2,H/2,H*.72);
+  vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.35)');
+  ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);
+}
+
+function drawSprite(s,zbuf,RAYS){
+  const dx=s.x-P.x,dy=s.y-P.y;
+  const dd=Math.sqrt(dx*dx+dy*dy);
+  if(dd<0.3)return;
+  let ang=Math.atan2(dy,dx)-P.a;
+  while(ang>Math.PI)ang-=Math.PI*2;
+  while(ang<-Math.PI)ang+=Math.PI*2;
+  if(Math.abs(ang)>FOV*.65)return;
+  const sx=((ang/FOV)+.5)*W;
+  const sz=Math.min(H,H/dd*.9);
+  const halfH=H/2;
+  const ri=Math.floor(((ang/FOV)+.5)*RAYS);
+  let ok=false;
+  for(let r=Math.max(0,ri-4);r<=Math.min(RAYS-1,ri+4);r++){
+    if(zbuf[r]>=dd){ok=true;break;}
+  }
+  if(!ok)return;
+  const shade=Math.min(1,Math.max(.15,1-dd/10));
+  ctx.save();
+  ctx.globalAlpha=Math.min(1,shade*1.1);
+  if(s._e){
+    const bw=sz*.28,bh=sz*.72,hw=sz*.2;
+    // glow
+    const g=ctx.createRadialGradient(sx,halfH-sz*.35,0,sx,halfH-sz*.35,sz*.4);
+    g.addColorStop(0,'rgba(90,0,0,'+shade*.3+')');g.addColorStop(1,'rgba(90,0,0,0)');
+    ctx.fillStyle=g;ctx.fillRect(sx-sz*.4,halfH-sz*.5,sz*.8,sz*.5);
+    // body
+    ctx.fillStyle='#040202';
+    ctx.fillRect(sx-bw/2,halfH-sz*.35,bw,bh);
+    // head
+    ctx.beginPath();ctx.ellipse(sx,halfH-sz*.4,hw*.5,hw*.75,0,0,Math.PI*2);ctx.fill();
+    // eyes
+    const es=Math.max(1.5,sz*.028);
+    ctx.fillStyle='rgba(210,30,30,'+shade+')';
+    ctx.beginPath();
+    ctx.arc(sx-sz*.038,halfH-sz*.4,es,0,Math.PI*2);
+    ctx.arc(sx+sz*.038,halfH-sz*.4,es,0,Math.PI*2);
+    ctx.fill();
+  }else{
+    const nw=Math.max(8,sz*.2),nh=Math.max(10,sz*.25);
+    const g=ctx.createRadialGradient(sx,halfH,0,sx,halfH,nw*3);
+    g.addColorStop(0,'rgba(212,168,67,'+shade*.4+')');g.addColorStop(1,'rgba(212,168,67,0)');
+    ctx.fillStyle=g;ctx.fillRect(sx-nw*3,halfH-nw*3,nw*6,nw*6);
+    ctx.fillStyle='rgba(200,175,110,'+Math.min(1,shade*1.3)+')';
+    ctx.fillRect(sx-nw/2,halfH-nh/2,nw,nh);
+  }
+  ctx.restore();
+}
+
+// ═══════════════════════════════════
+// MINIMAP
+// ═══════════════════════════════════
+const MSX=mm.width/MW,MSY=mm.height/MH;
+function drawMM(){
+  mctx.fillStyle='#050403';mctx.fillRect(0,0,mm.width,mm.height);
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){
+    const c=MAP[y*MW+x];
+    mctx.fillStyle=c===0?'#1c1712':c===3?'#1a3018':c===2?'#3a2818':'#252018';
+    mctx.fillRect(x*MSX+.5,y*MSY+.5,MSX-1,MSY-1);
+  }
+  notes.forEach(n=>{
+    if(n.collected)return;
+    mctx.fillStyle='#d4a843';
+    mctx.fillRect(n.x*MSX-1,n.y*MSY-1,2.5,2.5);
+  });
+  if(ENT.active){
+    mctx.fillStyle='#8b1212';
+    mctx.beginPath();mctx.arc(ENT.x*MSX,ENT.y*MSY,2.5,0,Math.PI*2);mctx.fill();
+  }
+  mctx.fillStyle='#fff';
+  mctx.beginPath();mctx.arc(P.x*MSX,P.y*MSY,2,0,Math.PI*2);mctx.fill();
+  mctx.strokeStyle='#ffffffaa';mctx.lineWidth=1;
+  mctx.beginPath();
+  mctx.moveTo(P.x*MSX,P.y*MSY);
+  mctx.lineTo(P.x*MSX+Math.cos(P.a)*5,P.y*MSY+Math.sin(P.a)*5);
+  mctx.stroke();
+}
+
+// ═══════════════════════════════════
+// INTERACTIONS
+// ═══════════════════════════════════
+function tryInteract(){
+  if(!gameOn||!alive||nearIdx<0)return;
+  const n=notes[nearIdx];
+  n.collected=true;nearIdx=-1;
+  noteCount++;
+  document.getElementById('nC').textContent=noteCount;
+  sanity=Math.min(100,sanity+12);
+  document.getElementById('prompt').style.display='none';
+  gameOn=false;
+  document.getElementById('noteBody').textContent=STORY[n.si].text;
+  document.getElementById('noteScreen').classList.remove('hidden');
+  if(document.pointerLockElement)document.exitPointerLock();
+}
+function closeNote(){
+  document.getElementById('noteScreen').classList.add('hidden');
+  gameOn=true;
+  if(!isMob)document.body.requestPointerLock().catch(()=>{});
+}
+
+let msgT;
+function showMsg(t){
+  const p=document.getElementById('prompt');
+  p.textContent=t;p.style.display='block';
+  clearTimeout(msgT);msgT=setTimeout(()=>p.style.display='none',2200);
+}
+
+function spawnEnt(){
+  if(ENT.active)return;
+  const a=P.a+Math.PI+(Math.random()-.5)*.9;
+  const d=10+Math.random()*5;
+  let ex=P.x+Math.cos(a)*d,ey=P.y+Math.sin(a)*d;
+  ex=Math.max(1.5,Math.min(MW-1.5,ex));
+  ey=Math.max(1.5,Math.min(MH-1.5,ey));
+  if(solid(ex,ey))return;
+  ENT.x=ex;ENT.y=ey;ENT.active=true;
+  doFlash('#0a0000',60);
+  playJump();
+}
+function despawnEnt(){
+  ENT.active=false;
+  document.getElementById('fear').style.opacity=0;
+}
+function die(){
+  if(!alive)return;
+  alive=false;gameOn=false;despawnEnt();
+  if(document.pointerLockElement)document.exitPointerLock();
+  doFlash('#400',300);
+  setTimeout(()=>document.getElementById('deathScreen').classList.remove('hidden'),450);
+}
+function triggerWin(){
+  alive=false;gameOn=false;
+  if(document.pointerLockElement)document.exitPointerLock();
+  doFlash('#fff',200);
+  setTimeout(()=>document.getElementById('winScreen').classList.remove('hidden'),380);
+}
+let fT;
+function doFlash(col,ms){
+  const f=document.getElementById('flash');
+  f.style.background=col;f.style.opacity=.85;f.style.transition='opacity .04s';
+  clearTimeout(fT);fT=setTimeout(()=>{f.style.opacity=0;f.style.transition='opacity .5s';},ms);
+}
+
+// Start the render loop immediately (shows black until game starts)
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
